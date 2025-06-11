@@ -198,7 +198,7 @@ class MedicalDataImporter:
 
             self.import_sleep_data()
             self.import_qa_data()
-            
+
             print("数据导入完成！")
             
         except Exception as e:

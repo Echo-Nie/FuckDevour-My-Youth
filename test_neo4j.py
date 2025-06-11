@@ -26,7 +26,7 @@ def test_neo4j_connection():
             result = session.run("MATCH (d:Disease) RETURN d")
             for record in result:
                 print("节点信息：", record["d"])
-            
+
     except Exception as e:
         print("连接失败：", str(e))
     finally:

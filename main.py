@@ -114,7 +114,7 @@ def main():
                 break
 
             qa_system.answer_question(question)
-            
+
     except KeyboardInterrupt:
         print("\n程序已终止")
     finally:

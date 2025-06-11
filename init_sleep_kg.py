@@ -123,7 +123,7 @@ def init_sleep_kg():
                     description: '睡前进行放松活动，如冥想或阅读',
                     difficulty: '低',
                     importance: '中'
-                })
+                }) 
                 CREATE (a3:Advice {
                     name: '避免咖啡因',
                     description: '睡前6小时避免摄入咖啡因',

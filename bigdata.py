@@ -42,7 +42,7 @@ class MedicalDataImporter:
                         })
                         MERGE (a:Answer {
                             text: $answer
-                        })
+                        }) 
                         MERGE (q)-[:HAS_ANSWER]->(a)
                     """, {
                         'question': item['questions'][0],
