@@ -64,6 +64,7 @@ def init_neo4j():
             MERGE (t:Treatment {name: treatment})
             MERGE (d)-[:HAS_TREATMENT]->(t)
             """)
+
             
             print("\n数据初始化完成！")
             

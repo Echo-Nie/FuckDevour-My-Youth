@@ -32,6 +32,7 @@ class SleepQA:
 
     def query_knowledge_graph(self, query_type: str, keywords: List[str]) -> List[Dict]:
         """从知识图谱中查询相关信息"""
+
         try:
             with self.driver.session() as session:
                 if query_type == "sleep_disorder":

@@ -31,6 +31,7 @@ for chunk in response:
         content += chunk.choices[0].delta.content
         print(chunk.choices[0].delta.content, end='')
 
+
     if chunk.choices[0].delta.reasoning_content:
         if is_first_reasoning:
             print("</think>", end='')

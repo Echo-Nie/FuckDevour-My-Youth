@@ -247,6 +247,7 @@ def get_knowledge_graph_data():
                     "relationships": []
                 })
 
+
             print("知识图谱数据获取成功！")
             return jsonify({
                 "nodes": nodes,
