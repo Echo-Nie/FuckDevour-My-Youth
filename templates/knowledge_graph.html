@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识图谱可视化</title>
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet"
+        type="text/css" />
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2196f3;
+        }
+
+        .graph-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            height: 600px;
+            position: relative;
+        }
+
+        #neo4j-graph {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .message {
+            text-align: center;
+            color: #666;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #2196f3;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-button:hover {
+            background-color: #1976d2;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .controls button {
+            padding: 8px 15px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .controls button:hover {
+            background-color: #1976d2;
+        }
+
+        .controls button.active {
+            background-color: #1565c0;
+        }
+
+        .layout-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .layout-option {
+            padding: 8px 15px;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .layout-option:hover {
+            background-color: #bbdefb;
+        }
+
+        .layout-option.active {
+            background-color: #2196f3;
+            color: white;
+        }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>医疗知识图谱可视化</h1>
+    </div>
+    <div class="layout-options">
+        <div class="layout-option active" data-layout="force">力导向布局</div>
+        <div class="layout-option" data-layout="hierarchical">层级布局</div>
+    </div>
+    <div class="controls">
+        <button onclick="resetZoom()">重置视图</button>
+        <button onclick="togglePhysics()">切换物理引擎</button>
+        <button onclick="toggleLabels()">切换标签显示</button>
+    </div>
+    <div class="graph-container">
+        <div id="neo4j-graph"></div>
+        <p class="message" id="graphMessage" style="display: none;">知识图谱加载失败，请检查后端服务。</p>
+    </div>
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff6b6b;"></div>
+            <span>疾病</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #4ecdc4;"></div>
+            <span>症状</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #45b7d1;"></div>
+            <span>治疗</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #96ceb4;"></div>
+            <span>风险因素</span>
+        </div>
+    </div>
+    <a href="/" class="back-button">返回主页</a>
+
+    <script>
+        let network = null;
+        let physicsEnabled = true;
+        let labelsVisible = true;
+        let currentLayout = 'force';
+
+        const layoutOptions = {
+            force: {
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        springLength: 200
+                    }
+                },
+                layout: {
+                    improvedLayout: true,
+                    randomSeed: 2
+                }
+            },
+            hierarchical: {
+                physics: {
+                    enabled: false
+                },
+                layout: {
+                    hierarchical: {
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        levelSeparation: 200
+                    }
+                }
+            }
+        };
+
+        async function fetchAndRenderGraph() {
+            const graphDiv = document.getElementById('neo4j-graph');
+            const messageDiv = document.getElementById('graphMessage');
+            messageDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/knowledge_graph_data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                // 创建节点和边的数据
+                const nodes = new vis.DataSet(data.nodes.map(node => ({
+                    id: node.id,
+                    label: node.label,
+                    title: node.properties.description || node.label,
+                    color: getNodeColor(node.type),
+                    shape: 'dot',
+                    size: 20
+                })));
+
+                const edges = new vis.DataSet(data.relationships.map(rel => ({
+                    from: rel.startNode,
+                    to: rel.endNode,
+                    label: rel.type,
+                    arrows: 'to',
+                    smooth: {
+                        type: 'continuous'
+                    }
+                })));
+
+                // 配置选项
+                const options = {
+                    nodes: {
+                        font: {
+                            size: 14,
+                            face: 'Microsoft YaHei'
+                        }
+                    },
+                    edges: {
+                        font: {
+                            size: 12,
+                            face: 'Microsoft YaHei'
+                        },
+                        color: {
+                            color: '#848484',
+                            highlight: '#2196f3'
+                        }
+                    },
+                    interaction: {
+                        hover: true,
+                        tooltipDelay: 200
+                    },
+                    ...layoutOptions[currentLayout]
+                };
+
+                // 创建网络
+                const container = document.getElementById('neo4j-graph');
+                network = new vis.Network(container, { nodes, edges }, options);
+
+                // 添加稳定事件监听
+                network.on('stabilizationIterationsDone', function () {
+                    network.setOptions({ physics: { enabled: false } });
+                });
+
+            } catch (error) {
+                console.error('获取或渲染知识图谱失败:', error);
+                messageDiv.style.display = 'block';
+            }
+        }
+
+        function getNodeColor(type) {
+            const colors = {
+                'SleepDisorder': '#ff6b6b',
+                'Symptom': '#4ecdc4',
+                'Treatment': '#45b7d1',
+                'RiskFactor': '#96ceb4',
+                'default': '#ffd93d'
+            };
+            return colors[type] || colors.default;
+        }
+
+        function resetZoom() {
+            if (network) {
+                // 刷新整个浏览器页面
+                window.location.reload();
+            }
+        }
+
+        function togglePhysics() {
+            if (network) {
+                physicsEnabled = !physicsEnabled;
+                network.setOptions({ physics: { enabled: physicsEnabled } });
+            }
+        }
+
+        function toggleLabels() {
+            if (network) {
+                labelsVisible = !labelsVisible;
+                network.setOptions({
+                    nodes: {
+                        font: {
+                            size: labelsVisible ? 14 : 0
+                        }
+                    },
+                    edges: {
+                        font: {
+                            size: labelsVisible ? 12 : 0
+                        }
+                    }
+                });
+            }
+        }
+
+        function changeLayout(layout) {
+            currentLayout = layout;
+            if (network) {
+                // 重置物理引擎状态
+                physicsEnabled = layout === 'force';
+
+                // 应用新的布局选项
+                network.setOptions({
+                    layout: layoutOptions[layout].layout,
+                    physics: layoutOptions[layout].physics
+                });
+
+                // 如果是力导向布局，重新启用物理引擎
+                if (layout === 'force') {
+                    network.setOptions({
+                        physics: {
+                            enabled: true,
+                            barnesHut: {
+                                gravitationalConstant: -2000,
+                                springLength: 200
+                            }
+                        }
+                    });
+
+                    // 添加稳定事件监听
+                    network.once('stabilizationIterationsDone', function () {
+                        network.setOptions({ physics: { enabled: false } });
+                    });
+                }
+
+                // 直接调用 network.fit() 来调整视图，不调用 resetZoom() 避免刷新页面
+                network.fit({
+                    animation: {
+                        duration: 1000,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            }
+        }
+
+        // 添加布局切换事件监听
+        document.querySelectorAll('.layout-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                document.querySelectorAll('.layout-option').forEach(opt => opt.classList.remove('active'));
+                e.target.classList.add('active');
+                changeLayout(e.target.dataset.layout);
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', fetchAndRenderGraph);
+    </script>
+</body>
+
+</html>
