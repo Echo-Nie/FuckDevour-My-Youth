@@ -89,7 +89,7 @@
 - Git（用于克隆仓库）
 
 ```bash
-git clone https://github.com/your-repo/DeepSeekAI.git
+https://github.com/Echo-Nie/FuckDevour-My-Youth.git
 ```
 
 使用 **ctrl+F** 搜索所有的 `NTSoftware-Devour-My-Youth` 换成对应的`username`、`password`、`api_key` 
